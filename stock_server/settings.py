@@ -25,8 +25,10 @@ SECRET_KEY = "django-insecure-2#6!!8pr7vome(k8aa^)!@%cpw7ua___9pwxnwl2bbqe&n%n2n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
+
+TUSHARE_TOKEN = "a8890b4cf459e127e9ad01f2b682451895211c0b633939a6227c1a9e"
 
 # Application definition
 
@@ -37,7 +39,17 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "stocks",
+    "channels"
 ]
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+ASGI_APPLICATION = "stock_server.asgi.application"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -67,7 +79,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "stock_server.wsgi.application"
+# WSGI_APPLICATION = "stock_server.wsgi.application"
 
 
 # Database
