@@ -1,8 +1,12 @@
 # stocks/views.py
 
 import json
-from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest
+import os
+
+from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest, HttpResponseNotFound
 from django.views import View
+
+from stock_server import settings
 from .services import CandidateService
 
 
@@ -18,8 +22,21 @@ class CandidateView(View):
         service = CandidateService()
         if action == 'candidates':
             data = service.get_candidates()
+            # # 假设 test.json 放在 stocks 应用根目录
+            # json_path = os.path.join(settings.BASE_DIR, 'stocks', 'test.json')
+            # if not os.path.exists(json_path):
+            #     return HttpResponseNotFound('test.json not found')
+            #
+            # with open(json_path, encoding='utf-8') as f:
+            #     data = json.load(f)
+            #
+            # return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False})
         elif action == 'ma5cross':
             data = service.get_ma5_cross_ma10()
+        elif action == 'lianban-or-ma5cross':
+            data = service.get_lianban_or_up_ma5()
+        elif action == 'today-limit-kline':
+            data = service.get_today_limit_with_kline()
         else:
             return HttpResponseBadRequest('未知的 action')
 
