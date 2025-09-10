@@ -41,7 +41,7 @@ class ExplosionModelBuilder:
         # 过滤 ST、科创板、北交所
         df = df[~df["name"].str.match(r'^[\*\s]*ST')]
         df = df[~df["ts_code"].str.startswith("688")]
-        df = df[df["exchange"] != "BSE"]
+        df = df[df["exchange"] != "BSE"]    
         df = df.reset_index(drop=True)
         return df
 
