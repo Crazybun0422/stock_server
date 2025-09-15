@@ -4,8 +4,12 @@
 # @Author：Malcolm
 # @File : consumers.py
 # @Software: PyCharm
+
+import asyncio
+from celery.result import AsyncResult
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from stocks.services import CandidateService
+from stocks.tasks import build_explosion_patterns
 
 
 class CandidateConsumer(AsyncJsonWebsocketConsumer):
@@ -28,3 +32,33 @@ class CandidateConsumer(AsyncJsonWebsocketConsumer):
             # 同步调用（耗时），可考虑移到线程
             results = service.get_candidates()
             await self.send_json({'candidates': results})
+
+
+class TrainingProgressConsumer(AsyncJsonWebsocketConsumer):
+    """WebSocket consumer to report Celery training task progress."""
+
+    async def connect(self):
+        await self.accept()
+        await self.send_json({'message': 'Connected to Training WebSocket'})
+        self._result: AsyncResult | None = None
+
+    async def receive_json(self, content, **kwargs):
+        action = content.get('action')
+        if action == 'start':
+            self._result = build_explosion_patterns.delay()
+            await self.send_json({'task_id': self._result.id})
+            while not self._result.ready():
+                meta = self._result.info or {}
+                await self.send_json({
+                    'progress': meta.get('current', 0),
+                    'total': meta.get('total', 1),
+                })
+                await asyncio.sleep(1)
+            meta = self._result.info or {}
+            await self.send_json({'status': 'completed', **meta})
+        elif action == 'status' and self._result is not None:
+            meta = self._result.info or {}
+            await self.send_json({
+                'progress': meta.get('current', 0),
+                'total': meta.get('total', 1),
+            })

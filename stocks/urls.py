@@ -7,9 +7,12 @@
 
 
 from django.urls import path
-from .views import CandidateView
+from .views import CandidateView, start_explosion, pause_explosion, list_explosions
 
 urlpatterns = [
     path('api/<str:action>/', CandidateView.as_view(), name='candidates'),
+    path('explosion/start/', start_explosion, name='explosion-start'),
+    path('explosion/pause/', pause_explosion, name='explosion-pause'),
+    path('explosion/', list_explosions, name='explosion-list'),
 ]
 
