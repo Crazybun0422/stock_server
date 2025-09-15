@@ -103,6 +103,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from django.conf import settings
 from loguru import logger
+import re
 
 
 class CandidateService:
@@ -417,3 +418,84 @@ class CandidateService:
             })
 
         return results
+
+# Board codes for fetching stocks by board
+# MAIN - 沪深主板
+# GEM - 创业板
+# STAR - 科创板
+# ST - ST股
+# BSE - 北交所
+BOARD_MAIN = "MAIN"
+BOARD_GEM = "GEM"
+BOARD_STAR = "STAR"
+BOARD_ST = "ST"
+BOARD_BSE = "BSE"
+
+
+def get_board_stocks(board: str) -> list[dict]:
+    """Return today's stocks for a given board."""
+    ts.set_token(settings.TUSHARE_TOKEN)
+    pro = ts.pro_api()
+    today = datetime.now().strftime('%Y%m%d')
+
+    daily = pro.daily(
+        trade_date=today,
+        fields='ts_code,open,pre_close,close,pct_chg,amp,amount'
+    )
+    basic = pro.daily_basic(
+        trade_date=today,
+        fields='ts_code,volume_ratio,total_mv,circ_mv'
+    )
+    mf = pro.moneyflow(
+        trade_date=today,
+        fields='ts_code,net_mf_amount,buy_lg_amount,buy_elg_amount,sell_lg_amount,sell_elg_amount'
+    )
+    info = pro.stock_basic(
+        exchange='', list_status='L', fields='ts_code,name,market'
+    )
+
+    df = daily.merge(basic, on='ts_code', how='left')
+    df = df.merge(mf, on='ts_code', how='left')
+    df = df.merge(info, on='ts_code', how='left')
+
+    def classify(row):
+        name = row.get('name', '') or ''
+        code = row['ts_code']
+        market = row.get('market', '') or ''
+        if re.match(r'^\s*ST', name, re.IGNORECASE):
+            return BOARD_ST
+        if market == '科创板' or code.startswith('688'):
+            return BOARD_STAR
+        if market == '创业板' or code.startswith('300'):
+            return BOARD_GEM
+        if market == '北交所' or code.startswith('83'):
+            return BOARD_BSE
+        return BOARD_MAIN
+
+    df['board'] = df.apply(classify, axis=1)
+    df = df[df['board'] == board]
+
+    df['auction_chg'] = (df['open'] - df['pre_close']) / df['pre_close'] * 100
+    df['main_buy'] = (df['buy_lg_amount'].fillna(0) + df['buy_elg_amount'].fillna(0))
+    df['main_sell'] = (df['sell_lg_amount'].fillna(0) + df['sell_elg_amount'].fillna(0))
+
+    results = []
+    for _, row in df.iterrows():
+        results.append({
+            'ts_code': row.ts_code,
+            'name': row.name,
+            'auction_chg': round(row.auction_chg, 2),  # 竞价涨幅
+            'volume_ratio': row.volume_ratio,  # 量比
+            'close': row.close,  # 收盘价
+            'pct_chg': row.pct_chg,  # 涨幅
+            'net_main_inflow': row.net_mf_amount,  # 主力净流入
+            'main_buy': row.main_buy,  # 主力买
+            'main_sell': row.main_sell,  # 主力卖
+            'board': row.board,  # 股票所属板块
+            'amount': row.amount,  # 成交额
+            'total_mv': row.total_mv,  # 总市值
+            'circ_mv': row.circ_mv,  # 流通市值
+            'amp': row.amp,  # 振幅
+        })
+
+    return results
