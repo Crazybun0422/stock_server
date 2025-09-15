@@ -5,8 +5,9 @@
 # @File : routing.py
 # @Software: PyCharm
 from django.urls import re_path
-from stocks.consumers import CandidateConsumer
+from stocks.consumers import CandidateConsumer, TrainingProgressConsumer
 
 websocket_urlpatterns = [
     re_path(r'ws/stocks/$', CandidateConsumer.as_asgi()),
+    re_path(r'ws/training/$', TrainingProgressConsumer.as_asgi()),
 ]

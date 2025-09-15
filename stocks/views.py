@@ -1,13 +1,19 @@
 # stocks/views.py
 
 import json
-import os
 
 from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest, HttpResponseNotFound
 from django.views import View
+from django.views.decorators.http import require_POST, require_GET
 
 from stock_server import settings
+from celery.result import AsyncResult
+import pymongo
+
 from .services import CandidateService
+from .tasks import build_explosion_patterns
+
+_task_id: str | None = None
 
 
 class CandidateView(View):
@@ -18,7 +24,7 @@ class CandidateView(View):
     返回波段底部候选股票的 JSON 列表。
     """
 
-    def get(self, request: HttpRequest,action) -> HttpResponseBadRequest | JsonResponse:
+    def get(self, request: HttpRequest, action) -> HttpResponseBadRequest | JsonResponse:
         service = CandidateService()
         if action == 'candidates':
             data = service.get_candidates()
@@ -52,3 +58,41 @@ class CandidateView(View):
         service = CandidateService(lookback_days=lookback) if lookback else CandidateService()
         data = service.get_candidates()
         return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+
+
+@require_POST
+def start_explosion(request: HttpRequest) -> JsonResponse:
+    """启动生成起爆图的后台任务."""
+    global _task_id
+    result = build_explosion_patterns.delay()
+    _task_id = result.id
+    return JsonResponse({'task_id': _task_id})
+
+
+@require_POST
+def pause_explosion(request: HttpRequest) -> JsonResponse | HttpResponseBadRequest:
+    """暂停当前运行的任务."""
+    global _task_id
+    try:
+        body = json.loads(request.body.decode('utf-8')) if request.body else {}
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest('请求体必须是合法 JSON')
+    task_id = body.get('task_id') or _task_id
+    if not task_id:
+        return HttpResponseBadRequest('缺少 task_id')
+    AsyncResult(task_id).revoke(terminate=True)
+    return JsonResponse({'status': 'revoked', 'task_id': task_id})
+
+
+@require_GET
+def list_explosions(request: HttpRequest) -> JsonResponse:
+    """分页返回已生成的起爆图."""
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('page_size', 10))
+    mongo_client = pymongo.MongoClient(getattr(settings, 'MONGO_URI', 'mongodb://localhost:27017/'))
+    db = mongo_client.get_default_database() or mongo_client['productdb']
+    collection = db['explosion_patterns']
+    total = collection.count_documents({})
+    items = list(collection.find({}, {'_id': 0}).skip((page - 1) * size).limit(size))
+    return JsonResponse({'total': total, 'page': page, 'page_size': size, 'items': items},
+                        json_dumps_params={'ensure_ascii': False})
