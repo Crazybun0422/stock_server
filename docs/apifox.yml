@@ -1,0 +1,178 @@
+openapi: '3.0.0'
+info:
+  title: 'Stock Server API'
+  version: '1.0.0'
+paths:
+  /api/{action}/:
+    get:
+      summary: '查询候选股票或指标'
+      parameters:
+        -
+          name: 'action'
+          in: 'path'
+          required: true
+          description: 'candidates | ma5cross | lianban-or-ma5cross | today-limit-kline'
+          schema:
+            type: 'string'
+            enum:
+              - 'candidates'
+              - 'ma5cross'
+              - 'lianban-or-ma5cross'
+              - 'today-limit-kline'
+        -
+          name: 'days'
+          in: 'query'
+          required: false
+          schema:
+            type: 'integer'
+      responses:
+        200:
+          description: 'List of stocks'
+          content:
+            application/json:
+              schema:
+                type: 'array'
+                items:
+                  type: 'object'
+    post:
+      summary: '通过JSON请求查询候选股票'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: 'object'
+              properties:
+                days:
+                  type: 'integer'
+      responses:
+        200:
+          description: 'List of stocks'
+          content:
+            application/json:
+              schema:
+                type: 'array'
+                items:
+                  type: 'object'
+  /board/:
+    get:
+      summary: '按板块获取股票'
+      parameters:
+        -
+          name: 'board'
+          in: 'query'
+          required: true
+          description: 'Board code'
+          schema:
+            type: 'string'
+            enum:
+              - 'MAIN'
+              - 'GEM'
+              - 'STAR'
+              - 'ST'
+              - 'BSE'
+        -
+          name: 'page'
+          in: 'query'
+          required: false
+          schema:
+            type: 'integer'
+            default: 1
+        -
+          name: 'page_size'
+          in: 'query'
+          required: false
+          schema:
+            type: 'integer'
+            default: 20
+      responses:
+        200:
+          description: 'Paginated stock list'
+          content:
+            application/json:
+              schema:
+                type: 'object'
+                properties:
+                  total:
+                    type: 'integer'
+                  page:
+                    type: 'integer'
+                  page_size:
+                    type: 'integer'
+                  items:
+                    type: 'array'
+                    items:
+                      type: 'object'
+  /explosion/start/:
+    post:
+      summary: '启动爆发形态任务'
+      responses:
+        200:
+          description: 'Task started'
+          content:
+            application/json:
+              schema:
+                type: 'object'
+                properties:
+                  task_id:
+                    type: 'string'
+  /explosion/pause/:
+    post:
+      summary: '暂停爆发任务'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: 'object'
+              properties:
+                task_id:
+                  type: 'string'
+      responses:
+        200:
+          description: 'Task revoked'
+          content:
+            application/json:
+              schema:
+                type: 'object'
+                properties:
+                  status:
+                    type: 'string'
+                  task_id:
+                    type: 'string'
+  /explosion/:
+    get:
+      summary: '列出爆发形态'
+      parameters:
+        -
+          name: 'page'
+          in: 'query'
+          required: false
+          schema:
+            type: 'integer'
+            default: 1
+        -
+          name: 'page_size'
+          in: 'query'
+          required: false
+          schema:
+            type: 'integer'
+            default: 10
+      responses:
+        200:
+          description: 'Paginated explosion patterns'
+          content:
+            application/json:
+              schema:
+                type: 'object'
+                properties:
+                  total:
+                    type: 'integer'
+                  page:
+                    type: 'integer'
+                  page_size:
+                    type: 'integer'
+                  items:
+                    type: 'array'
+                    items:
+                      type: 'object'

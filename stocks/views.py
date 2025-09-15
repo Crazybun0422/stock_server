@@ -5,12 +5,21 @@ import json
 from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest, HttpResponseNotFound
 from django.views import View
 from django.views.decorators.http import require_POST, require_GET
+from django.core.paginator import Paginator
 
 from stock_server import settings
 from celery.result import AsyncResult
 import pymongo
 
-from .services import CandidateService
+from .services import (
+    CandidateService,
+    get_board_stocks,
+    BOARD_MAIN,
+    BOARD_GEM,
+    BOARD_STAR,
+    BOARD_ST,
+    BOARD_BSE,
+)
 from .tasks import build_explosion_patterns
 
 _task_id: str | None = None
@@ -58,6 +67,28 @@ class CandidateView(View):
         service = CandidateService(lookback_days=lookback) if lookback else CandidateService()
         data = service.get_candidates()
         return JsonResponse(data, safe=False, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+
+
+@require_GET
+def board_stocks(request: HttpRequest) -> JsonResponse | HttpResponseBadRequest:
+    """Return paginated stock info for a given board."""
+    board = request.GET.get('board')
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('page_size', 20))
+    if board not in {BOARD_MAIN, BOARD_GEM, BOARD_STAR, BOARD_ST, BOARD_BSE}:
+        return HttpResponseBadRequest('invalid board')
+    data = get_board_stocks(board)
+    paginator = Paginator(data, size)
+    page_obj = paginator.get_page(page)
+    return JsonResponse(
+        {
+            'total': paginator.count,
+            'page': page,
+            'page_size': size,
+            'items': list(page_obj),
+        },
+        json_dumps_params={'ensure_ascii': False},
+    )
 
 
 @require_POST
