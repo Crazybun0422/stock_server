@@ -440,8 +440,13 @@ def get_board_stocks(board: str) -> list[dict]:
 
     daily = pro.daily(
         trade_date=today,
-        fields='ts_code,open,pre_close,close,pct_chg,amp,amount'
+        fields='ts_code,open,pre_close,close,high,low,pct_chg,amount'
     )
+    if daily is None or daily.empty:
+        return []
+
+    pre_close = daily['pre_close'].replace(0, pd.NA)
+    daily['amp'] = (daily['high'] - daily['low']) / pre_close * 100
     basic = pro.daily_basic(
         trade_date=today,
         fields='ts_code,volume_ratio,total_mv,circ_mv'
